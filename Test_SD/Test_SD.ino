@@ -17,6 +17,7 @@
 
 // Se declara la variable archivo
 File archivo;
+int c = 0;
 
 void setup() {
   // Se abren las comunicaciones por el puerto serial:
@@ -36,12 +37,12 @@ void setup() {
 
   // Abre el archivo. Cabe aclarar que sólo se puede abrir un archivo al mismo tiempo,
   // entonces debes cerrar algún otro antes de abrir uno.
-  archivo = SD.open("test.txt", FILE_WRITE);
+  archivo = SD.open("test2.txt", FILE_WRITE);
 
   // Si el archivo abrió bien:
   if (archivo) {
     Serial.print("Escribiento en test.txt...");
-    archivo.println("Probando 1, 2, 3");
+    archivo.println("Invemar 17112020");
     // Cierra el archivo:
     archivo.close();
     Serial.println("Listo.");
@@ -51,9 +52,9 @@ void setup() {
   }
 
   // Vuelve a abrir el archivo para su lectura:
-  archivo = SD.open("test.txt", FILE_READ);
+  archivo = SD.open("dato_isla.txt", FILE_READ);
   if (archivo) {
-    Serial.println("test.txt:");
+    Serial.println("dato_isla.txt:");
 
     // Leer del archivo hasta que no haya más nada en él:
     char c = archivo.read();
@@ -66,10 +67,9 @@ void setup() {
     archivo.close();
   } else {
     // Si el archivo no abre, imprime un error:
-    Serial.println("Error abriendo test.txt");
+    Serial.println("Error abriendo dato_isla.txt");
   }
 }
 
 void loop() {
-  // No se hace más nada
 }
