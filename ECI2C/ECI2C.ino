@@ -14,7 +14,7 @@ int time_ = 600;                 //used to change the delay needed depending on 
 float ec_float;                 //float var used to hold the float value of the RTD.
 
 unsigned long previousMillis = 0;        // will store last time LED was updated
-const long intervalo = 5000;
+const long intervalo = 2000;
 
 
 void setup()                    //hardware initialization.
@@ -53,7 +53,7 @@ void loop() {                                                                   
 
       switch (code) {                       //switch case based on what the response code is.
         case 1:                             //decimal 1.
-          Serial.println("Success");        //means the command was successful.
+          Serial.println("Success OK");        //means the command was successful.
           break;                            //exits the switch case.
 
         case 2:                             //decimal 2.

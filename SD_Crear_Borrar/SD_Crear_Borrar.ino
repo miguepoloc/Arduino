@@ -1,22 +1,34 @@
-/*
-  SD card
-
-  Este ejemplo crea y borra un archivo en la SD
-  Circuito:
-   SD card usa el protocolo SPI:
-    SPI   - UNO     - SPI - Mega
- ** MOSI  - pin 11  - DI  - pin 51
- ** MISO  - pin 12  - DO  - pin 50
- ** CLK   - pin 13  - SCK - pin 52
- ** CS    - pin 4   - CS  - pin 53
-
-*/
 // Se incluyen las librerías
 #include <SPI.h>
 #include <SD.h>
+#include "FS.h"
 
-// Se declara la variable archivo
-File archivo;
+
+
+void writeFile(fs::FS &fs, const char * path, const char * mensaje){
+  Serial.printf("Escribiendo el archivo: %s\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if(!file){
+    Serial.println("Error al abrir el archivo para escribirlo");
+    return;
+  }
+  if(file.print(mensaje)){
+    Serial.println("Archivo escrito");
+  } else {
+    Serial.println("Error al escribir");
+  }
+  file.close();
+}
+
+void deleteFile(fs::FS &fs, const char * path){
+  Serial.printf("Borrando el archivo: %s\n", path);
+  if(fs.remove(path)){
+    Serial.println("Archivo borrado");
+  } else {
+    Serial.println("Error al borrar el archivo");
+  }
+}
 
 void setup() {
   // Se abren las comunicaciones por el puerto serial:
@@ -28,40 +40,14 @@ void setup() {
 
   Serial.print("Inicializando SD card...");
 
-  if (!SD.begin(53)) {
+  if (!SD.begin(5)) {
     Serial.println("Inicialización fallida!");
     while (1);
   }
   Serial.println("Inicialización lista.");
+  
+  writeFile(SD, "/hello2.txt", "{\"temperatura\": 12, \"humedad\":14}");
 
-  //Si existe el archivo
-  if (SD.exists("example.txt")) {
-    Serial.println("El archivo example.txt existe.");
-  } else {
-    Serial.println("El archivo example.txt no existe.");
-  }
-
-  // Abre un nuevo archivo e inmediatamente lo cierra:
-  Serial.println("Creando example.txt...");
-  archivo = SD.open("example.txt", FILE_WRITE);
-  archivo.close();
-
-  // Revisa si el archivo existe:
-  if (SD.exists("example.txt")) {
-    Serial.println("El archivo example.txt existe.");
-  } else {
-    Serial.println("El archivo example.txt no existe.");
-  }
-
-  // Elimina el archivo:
-  Serial.println("Eliminando el archivo example.txt...");
-  SD.remove("example.txt");
-
-  if (SD.exists("example.txt")) {
-    Serial.println("El archivo example.txt existe.");
-  } else {
-    Serial.println("El archivo example.txt no existe.");
-  }
 }
 
 void loop() {

@@ -17,14 +17,11 @@
 #include <Adafruit_MAX31865.h>
 
 //Pines para ESP8266
-#define CS 15
-#define MOSI 13
-#define MISO 12
-#define CLK 14
+#define CS 2
 
 // Use software SPI: CS, DI, DO, CLK
 
-Adafruit_MAX31865 thermo = Adafruit_MAX31865(CS, MOSI, MISO, CLK);
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(2);
 // use hardware SPI, just pass in the CS pin
 //Adafruit_MAX31865 thermo = Adafruit_MAX31865(10);
 
@@ -77,5 +74,5 @@ void loop() {
     thermo.clearFault();
   }
   Serial.println();
-  delay(1000);
+  delay(5000);
 }
