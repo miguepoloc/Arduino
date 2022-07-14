@@ -3,8 +3,6 @@
 #include <SD.h>
 #include "FS.h"
 
-
-
 void writeFile(fs::FS &fs, const char * path, const char * mensaje){
   Serial.printf("Escribiendo el archivo: %s\n", path);
 
