@@ -1,63 +1,56 @@
+
+
 // Código para el nodo de Sistemas Inteligentes
 
 // Librería para el sensor de temperatura del suelo
-#include <Adafruit_MAX31865.h>
+// #include <Adafruit_MAX31865.h>
 
 // Se incluyen las librerías de la SD
 #include <SPI.h>
 #include <SD.h>
-#include "FS.h"
+#include <FS.h>
 
 
-// Pin de conexión SPI para la PT100
-#define CS_PT100 2
+#include <WebServer.h>
+#include <Adafruit_BME280.h>
 
-Adafruit_MAX31865 thermo = Adafruit_MAX31865(CS_PT100);
+#define SEALEVELPRESSURE_HPA (1013.25)
 
-// Valor de referencia de la resistencia. Se usa 430.0 para PT100 y 4300.0 para PT1000
-#define RREF 430.0
-// El valor nominal a 0°C de la resistencia es de 100 para PT100 y 1.000 para PT1000
-#define RNOMINAL  100.0
+Adafruit_BME280 bme;
 
-float valor_pt100;
+float temperature, humidity, pressure, altitude;
 
-void pt100() {
-  uint16_t rtd = thermo.readRTD();
+/*Put your SSID & Password*/
+//const char* ssid = "LAB PROCESOS";  // Enter SSID here
+//const char* password = "Pr0c3s0sUn1m4gd4l3n@.2017#*";  //Enter Password here
 
-  Serial.print("RTD valor: "); Serial.println(rtd);
-  float ratio = rtd;
-  ratio /= 32768;
-  Serial.print("Ratio = "); Serial.println(ratio, 8);
-  Serial.print("Resistencia = "); Serial.println(RREF * ratio, 8);
-  valor_pt100 = thermo.temperature(RNOMINAL, RREF);
-  Serial.print("Temperatura = "); Serial.println(valor_pt100);
+//WebServer server(80);
 
-  // Check and print any faults
-  uint8_t fault = thermo.readFault();
-  if (fault) {
-    Serial.print("Fault 0x"); Serial.println(fault, HEX);
-    if (fault & MAX31865_FAULT_HIGHTHRESH) {
-      Serial.println("RTD High Threshold");
-    }
-    if (fault & MAX31865_FAULT_LOWTHRESH) {
-      Serial.println("RTD Low Threshold");
-    }
-    if (fault & MAX31865_FAULT_REFINLOW) {
-      Serial.println("REFIN- > 0.85 x Bias");
-    }
-    if (fault & MAX31865_FAULT_REFINHIGH) {
-      Serial.println("REFIN- < 0.85 x Bias - FORCE- open");
-    }
-    if (fault & MAX31865_FAULT_RTDINLOW) {
-      Serial.println("RTDIN- < 0.85 x Bias - FORCE- open");
-    }
-    if (fault & MAX31865_FAULT_OVUV) {
-      Serial.println("Under/Over voltage");
-    }
-    thermo.clearFault();
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  bme.begin(0x76);
+  
+
+  //server.on("/hola/", handle_OnConnect);
+  //server.onNotFound(handle_NotFound);
+
+  //server.begin();
+  //Serial.println("HTTP server started");
+  Serial.print("Inicializando SD card...");
+
+  if (!SD.begin(5)) {
+    Serial.println("Inicialización fallida!");
+    while (1);
   }
-  Serial.println();
+  Serial.println("Inicialización lista.");
+ 
+  //writeFile(SD, "/hello2.txt", "{\"temperatura\": 12, \"humedad\":14}");
+  
 }
+
+
 
 void writeFile(fs::FS &fs, const char * path,const String mensaje) {
   Serial.printf("Escribiendo el archivo: %s\n", path);
@@ -74,33 +67,61 @@ void writeFile(fs::FS &fs, const char * path,const String mensaje) {
   }
   file.close();
 }
-void setup() {
-  Serial.begin(9600);
-  Serial.println("Adafruit MAX31865 PT100 con almacenamiento en SD");
 
-  thermo.begin(MAX31865_3WIRE);  // set to 2WIRE or 4WIRE as necessary
-  Serial.print("Inicializando SD card...");
+void readFile(fs::FS &fs, const char * path){
+  Serial.printf("Reading file: %s\n", path);
 
-  if (!SD.begin(5)) {
-    Serial.println("Inicialización fallida!");
-    while (1);
+  File file = fs.open(path);
+  if(!file){
+    Serial.println("Failed to open file for reading");
+    return;
   }
-  Serial.println("Inicialización lista.");
 
-
+  Serial.print("Read from file: ");
+  while(file.available()){
+    Serial.write(file.read());
+  }
+  file.close();
 }
+
+void appendFile(fs::FS &fs, const char * path, const char * message){
+  Serial.printf("Appending to file: %s\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if(!file){
+    Serial.println("Failed to open file for appending");
+    writeFile(SD, path, "");
+  }
+  if(file.print(message)){
+      Serial.println("Message appended");
+  } else {
+    Serial.println("Append failed");
+  }
+  file.close();
+}
+
 
 
 char Buf[50];
 void loop() {
   String msg = "{\"temperatura\": ";
-  pt100();
-  Serial.print("Prueba = "); Serial.println(valor_pt100);
-  // Serial.print("Función Temperatura = "); Serial.println(valor_pt100);
-  msg.concat(String(valor_pt100));
-  msg.concat(", \"humedad\":14}");
+  temperature = bme.readTemperature();
+  humidity = bme.readHumidity();
+  pressure = bme.readPressure() / 100.0F;
+  altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  Serial.print("Prueba = "); 
+  Serial.println(temperature);
+  Serial.print("Humedad = "); 
+  Serial.println(humidity);
   
+  msg.concat(String(temperature));
+  msg.concat(", \"humedad\":");
+  msg.concat(String(humidity));
+  msg.concat("}");
   msg.toCharArray(Buf, 50);
-  writeFile(SD, "/prueba2.json", msg);
+  appendFile(SD, "/prueba3.json", "buf");
   delay(10000);
+  
+  readFile(SD, "/prueba3.json");
+  
 }

@@ -1,6 +1,0 @@
-{
-    "board": "arduino:avr:megaADK",
-    "port": "COM6",
-    "programmer": "AVRISP mkII",
-    "sketch": "Datalogger_V1\\Datalogger_V1.ino"
-}
