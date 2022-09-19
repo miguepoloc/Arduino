@@ -46,12 +46,15 @@ AsyncWebServer server(80);
 
 // Ruta y nombre del archivo donde se almacena la información
 #define PATH ("/prueba1.json")
+#define PATHSD ("/tiemporeal1.txt")
 #define pinSD 5
 
 /* Variables para control de sensores */
 
 // Led de control
 const int ledPin = 2;
+// Led de control
+const int ledSD = 4;
 // Botón de control
 boolean botonPin = false;
 // Variable con la data
@@ -402,6 +405,7 @@ void initSDCard()
   if (!SD.begin(pinSD))
   {
     Serial.println("Fallo en el montaje de la SD");
+    digitalWrite(ledSD, HIGH);
     return;
   }
   uint8_t cardType = SD.cardType();
@@ -409,6 +413,7 @@ void initSDCard()
   if (cardType == CARD_NONE)
   {
     Serial.println("No hay tarjeta SD montada");
+    digitalWrite(ledSD, HIGH);
     return;
   }
   Serial.print("Tipo de SD: ");
@@ -474,7 +479,7 @@ String readSHT21Humedad()
   if (isnan(hum))
   {
     Serial.println("Error al leer la humedad del SHT21");
-    return "";
+    return "--";
   }
   else
   {
@@ -491,7 +496,7 @@ String readBME280Temperature()
   if (isnan(t))
   {
     Serial.println("Error al leer la temperatura del sensor BME280");
-    return "";
+    return "--";
   }
   else
   {
@@ -507,7 +512,7 @@ String readBME280Humidity()
   if (isnan(h))
   {
     Serial.println("Error al leer la humedad del sensor BME280");
-    return "";
+    return "--";
   }
   else
   {
@@ -523,7 +528,7 @@ String readBME280Pressure()
   if (isnan(p))
   {
     Serial.println("Error al leer la presión del sensor BME280");
-    return "";
+    return "--";
   }
   else
   {
@@ -540,7 +545,7 @@ String readBME280Altitude()
   if (isnan(a))
   {
     Serial.println("Error al leer la altura del sensor BME280");
-    return "";
+    return "--";
   }
   else
   {
@@ -704,23 +709,41 @@ String sensorRTD()
 String getSensorsData()
 {
   if (botonPin) {
+    tempsht = readSHT21Temperatura();
+    humsht = readSHT21Humedad();
+    temperaturaA = readBME280Temperature();
+    humedadA = readBME280Humidity();
+    presionA = readBME280Pressure();
+    altitud = readBME280Altitude();
+
     String object_sensors = "{";
     object_sensors.concat("\"Muestra\":");
     object_sensors.concat(muestras);
     object_sensors.concat(",\"Temperatura SHT\":");
-    object_sensors.concat(readSHT21Temperatura());
+    object_sensors.concat(tempsht);
     object_sensors.concat(",\"Humedad SHT\":");
-    object_sensors.concat(readSHT21Humedad());
+    object_sensors.concat(humsht);
+    object_sensors.concat(",\"Temperatura BME\":");
+    object_sensors.concat(temperaturaA);
+    object_sensors.concat(",\"Humedad BME\":");
+    object_sensors.concat(humedadA);
+    object_sensors.concat(",\"Presión BME\":");
+    object_sensors.concat(presionA);
+    object_sensors.concat(",\"Altitud BME\":");
+    object_sensors.concat(altitud);
     object_sensors.concat("}");
 
     Serial.print(object_sensors);
 
-    dataMessage = String(muestras) + "," + String(readSHT21Temperatura()) + "," + String(readSHT21Humedad()) + "\r\n";
+    dataMessage = String(muestras) + "," + String(tempsht) + "," + String(humsht)
+                  + "," + String(temperaturaA) + "," + String(humedadA) + "," + String(presionA)
+                  + "," + String(altitud)
+                  + "\r\n";
     Serial.print("Salvando la data: ");
     Serial.println(dataMessage);
 
     //Añade al archivo txt
-    appendFile(SD, "/datamigue.txt", dataMessage.c_str());
+    appendFile(SD, PATHSD, dataMessage.c_str());
     return object_sensors;
   }
 }
@@ -758,7 +781,10 @@ void setup()
   Wire.begin();
 
   pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);      // turn on pullup resistor
+  digitalWrite(ledPin, LOW);
+
+  pinMode(ledSD, OUTPUT);
+  digitalWrite(ledSD, LOW);
 
   /* SERVICIOS WEB  */
 
@@ -827,14 +853,15 @@ void setup()
 
   // If the data.txt file doesn't exist
   // Create a file on the SD card and write the data labels
-  File file = SD.open("/datamigue.txt");
+  File file = SD.open(PATHSD);
   if (!file) {
     Serial.println("El Archivo no existe");
     Serial.println("Creando el archivo...");
-    writeFile(SD, "/datamigue.txt", "Muestra, Temperatura, Humedad \r\n");
+    writeFile(SD, PATHSD, "Muestra, Temperatura sht, Humedad sht, Temperatura BME, Humedad BME, Presión BME, Altitud BME \r\n");
   }
   else {
     Serial.println("El archivo existe");
+    digitalWrite(ledSD, LOW);
   }
   file.close();
 
@@ -848,10 +875,20 @@ void setup()
 
   /* SENSORES
         SHT21: Temperatura y Humedad
+        BME280: Temperatura, humedad, presión y altitud
   */
 
   // Inicia el sensor SHT21
   SHT21.begin();
+  Serial.println("Inicialización SHT21 lista.");
+
+  // Inicia el sensor BME
+  if (!bme.begin(BME_ADDRESS)) {
+    Serial.println("No hay un módulo BME conectado");
+  }
+  else {
+    Serial.println("BME conectado");
+  }
 }
 
 void loop()
