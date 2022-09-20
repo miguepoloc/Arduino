@@ -1,0 +1,9 @@
+{
+  "files.associations": {
+    "*.js": "javascript",
+    "*.jsx": "javascriptreact",
+    "*.html": "html",
+    "chrono": "cpp",
+    "xiosbase": "cpp"
+}
+}

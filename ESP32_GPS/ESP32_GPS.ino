@@ -22,14 +22,14 @@ void setup(){
 
 void loop(){
   // Función para obtener los datos del GPS
-  GPS();
+  
   
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= intervalo) {
     // save the last time you blinked the LED
     previousMillis = currentMillis;
     //Fecha*latitud*longitud
-    Serial.println(datosGPS());
+    Serial.println(GPS());
   }
 }
 
@@ -44,6 +44,7 @@ void GPS() {
       //Longitud y latitud
       latitud = gps.location.lat();
       longitud = gps.location.lng();
+      return String(fecha) + "*" + String(latitud,6) + "*" + String(longitud,6);
     }
   }
 }

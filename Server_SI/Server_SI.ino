@@ -32,6 +32,10 @@
 #include "SHT21.h"
 // Librería del sensor BME280
 #include <Adafruit_BME280.h>
+// Librería para el control del otro puerto serial
+#include <HardwareSerial.h>
+// Librería del GPS
+#include <TinyGPS++.h>
 
 /* Variables para la red AP */
 
@@ -53,15 +57,21 @@ AsyncWebServer server(80);
 
 // Led de control
 const int ledPin = 2;
-// Led de control
+// Led de SD
 const int ledSD = 4;
+// Led de GPS
+const int ledGPS = 15;
 // Botón de control
 boolean botonPin = false;
 // Variable con la data
 String dataMessage;
 
 // Variables para almacenar datos de los sensores
-String temperaturaA, humedadA, presionA, altitud, PH, EC, RTD, tempsht, humsht;
+String temperaturaA, humedadA, presionA, altitud, PH, EC, RTD, tempsht, humsht, humS;
+
+// varibles pin analógico humedad del suelo
+const int portPin = 34;
+int valorAnalogico = 0;
 
 // Variable de control del Sensor de temperatura y humedad SHT21
 SHT21 SHT21;
@@ -70,6 +80,19 @@ SHT21 SHT21;
 #define SEALEVELPRESSURE_HPA (1013.25)
 #define BME_ADDRESS (0x76)
 Adafruit_BME280 bme;
+
+// Variables de control para el GPS
+// Pines GPIO a usar de Rx y Tx
+static const int RX2 = 16, TX2 = 17;
+
+// Variable con la fecha extraida del GPS
+char fecha[20] = " ";
+// Variables con la latitud y longitud extraida del GPS
+float latitud = 0, longitud = 0, altitudG = 0, precision = 0;
+// Variable para el control del GPS
+TinyGPSPlus gps;
+// Variable de control de los baudios de comunicación GPS
+static const uint32_t GPSBaud = 9600;
 
 // Variables para el sensor PH
 #define addressPH 99 // 0x63      //default I2C ID number for EZO pH Circuit.
@@ -705,16 +728,26 @@ String sensorRTD()
   }
 }
 
+// Función para extraer datos analógicos de la humedad del suelo
+String sueloHumedad()
+{
+  valorAnalogico = analogRead(portPin);
+  return String(valorAnalogico);
+}
+
 // Función global para obtener diversos datos
 String getSensorsData()
 {
-  if (botonPin) {
+  if (botonPin)
+  {
     tempsht = readSHT21Temperatura();
     humsht = readSHT21Humedad();
     temperaturaA = readBME280Temperature();
     humedadA = readBME280Humidity();
     presionA = readBME280Pressure();
     altitud = readBME280Altitude();
+    RTD = sensorRTD();
+    humS = sueloHumedad();
 
     String object_sensors = "{";
     object_sensors.concat("\"Muestra\":");
@@ -731,33 +764,80 @@ String getSensorsData()
     object_sensors.concat(presionA);
     object_sensors.concat(",\"Altitud BME\":");
     object_sensors.concat(altitud);
+    object_sensors.concat(",\"Temperatura Suelo\":");
+    object_sensors.concat(RTD);
+    object_sensors.concat(",\"Humedad Suelo\":");
+    object_sensors.concat(humS);
+    object_sensors.concat(",\"Latitud\":");
+    object_sensors.concat(String(latitud, 6));
+    object_sensors.concat(",\"Longitud\":");
+    object_sensors.concat(String(longitud, 6));
+    object_sensors.concat(",\"Presición GPS\":");
+    object_sensors.concat(precision);
+    object_sensors.concat(",\"Altitud GPS\":");
+    object_sensors.concat(altitudG);
     object_sensors.concat("}");
 
     Serial.print(object_sensors);
 
-    dataMessage = String(muestras) + "," + String(tempsht) + "," + String(humsht)
-                  + "," + String(temperaturaA) + "," + String(humedadA) + "," + String(presionA)
-                  + "," + String(altitud)
-                  + "\r\n";
+    dataMessage = String(muestras) + "," + String(tempsht) + "," + String(humsht) +
+                  "," + String(temperaturaA) + "," + String(humedadA) + "," + String(presionA) + "," +
+                  String(altitud) + "," + String(RTD) + "," + String(humS) + "," + String(latitud, 6) + "," +
+                  String(longitud, 6) + "," + String(precision) + "," + String(altitudG) + "\r\n";
     Serial.print("Salvando la data: ");
     Serial.println(dataMessage);
 
-    //Añade al archivo txt
+    // Añade al archivo txt
     appendFile(SD, PATHSD, dataMessage.c_str());
     return object_sensors;
   }
 }
 
-String controlSistema() {
+String controlSistema()
+{
   botonPin = !botonPin;
-  if (botonPin) {
+  if (botonPin)
+  {
     digitalWrite(ledPin, HIGH);
     String(muestras++);
     return ("Funcionando");
   }
-  else {
+  else
+  {
     digitalWrite(ledPin, LOW);
     return ("Apagado");
+  }
+}
+
+String GPS()
+{
+
+  if (gps.location.isUpdated() && gps.altitude.isUpdated())
+  {
+    latitud = gps.location.lat();
+    longitud = gps.location.lng();
+    precision = gps.hdop.value();
+    altitudG = gps.altitude.meters();
+    sprintf(fecha, "%02d-%02d-%02dT%02d:%02d:%02d", gps.date.year(), gps.date.month(),
+            gps.date.day(), gps.time.hour(), gps.time.minute(), gps.time.second());
+
+    Serial.print(" | satellites: ");
+    Serial.println(gps.satellites.value());
+    Serial.print(" | presición: ");
+    Serial.println(precision);
+    Serial.print(" | Altitud: ");
+    Serial.println(altitudG);
+    Serial.print(" | Latitud: ");
+    Serial.println(String(latitud, 6));
+    Serial.print(" | Longitud: ");
+    Serial.println(String(longitud, 6));
+    if (precision == 0) {
+      digitalWrite(ledGPS, HIGH);
+    }
+    else {
+      digitalWrite(ledGPS, LOW);
+    }
+    return String(fecha) + "*" + String(latitud, 6) + "*" + String(longitud, 6);
   }
 }
 
@@ -780,11 +860,17 @@ void setup()
   // Habilita el puerto I2C
   Wire.begin();
 
+  // Habilita como salida el pin del led que muestra si los datos están capturándose y los apaga
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
 
+  // Habilita como salida el pin del led que muestra si la SD falla y los apaga
   pinMode(ledSD, OUTPUT);
   digitalWrite(ledSD, LOW);
+
+  // Habilita como salida el pin del led que muestra si el GPS falla y los apaga
+  pinMode(ledGPS, OUTPUT);
+  digitalWrite(ledGPS, LOW);
 
   /* SERVICIOS WEB  */
 
@@ -828,7 +914,6 @@ void setup()
     request->send_P(200, "text/plain", controlSistema().c_str());
   });
 
-
   // Servicios para las gráficas
   //    server.on("/lib/highstock/highstock.js", HTTP_GET, [](AsyncWebServerRequest *request)
   //              { request->send(SPIFFS, "/lib/highstock/highstock.js"); });
@@ -854,12 +939,14 @@ void setup()
   // If the data.txt file doesn't exist
   // Create a file on the SD card and write the data labels
   File file = SD.open(PATHSD);
-  if (!file) {
+  if (!file)
+  {
     Serial.println("El Archivo no existe");
     Serial.println("Creando el archivo...");
-    writeFile(SD, PATHSD, "Muestra, Temperatura sht, Humedad sht, Temperatura BME, Humedad BME, Presión BME, Altitud BME \r\n");
+    writeFile(SD, PATHSD, "Muestra, Temperatura sht, Humedad sht, Temperatura BME, Humedad BME, Presión BME, Altitud BME, Temperatura Suelo, Humedad Suelo, Latitud, Longitud, Presición GPS, Altitud GPS \r\n");
   }
-  else {
+  else
+  {
     Serial.println("El archivo existe");
     digitalWrite(ledSD, LOW);
   }
@@ -876,6 +963,7 @@ void setup()
   /* SENSORES
         SHT21: Temperatura y Humedad
         BME280: Temperatura, humedad, presión y altitud
+        GPS
   */
 
   // Inicia el sensor SHT21
@@ -883,12 +971,17 @@ void setup()
   Serial.println("Inicialización SHT21 lista.");
 
   // Inicia el sensor BME
-  if (!bme.begin(BME_ADDRESS)) {
+  if (!bme.begin(BME_ADDRESS))
+  {
     Serial.println("No hay un módulo BME conectado");
   }
-  else {
+  else
+  {
     Serial.println("BME conectado");
   }
+
+  // Inicia el sensor GPS
+  Serial1.begin(GPSBaud, SERIAL_8N1, RX2, TX2);
 }
 
 void loop()
@@ -902,69 +995,18 @@ void loop()
     Se visualicen los datos más recientes.
   */
 
-  // Variable de tiempo que controla cada cuánto se ejecuta la función
-  //    unsigned long currentMillis = millis();
-  //    if (currentMillis - previousMillis >= intervalo && counter <= 50)
-  //    {
-  //        // save the last time you blinked the LED
-  //        previousMillis = currentMillis;
-  //        tempsht = readSHT21Temperatura();
-  //        humsht = readSHT21Humedad();
-  //        //    temperature = readBME280Temperature();
-  //        //    humidity = readBME280Humidity();
-  //        //    pressure = readBME280Pressure();
-  //        //    altitude = readBME280Altitude();
-  //        //    fecha_data = fecha();
-  //        //    PH = sensorPH();
-  //        //    EC = sensorEC();
-  //        //    RTD = sensorRTD();
-  //        //
-  //        Serial.print("Temperatura SHT21 = ");
-  //        Serial.println(tempsht);
-  //        //    Serial.print("Temperatura = ");
-  //        //    Serial.println(temperature);
-  //        //    Serial.print("Humedad = ");
-  //        //    Serial.println(humidity);
-  //        //    Serial.print("Presion = ");
-  //        //    Serial.println(pressure);
-  //        //    Serial.print("Altitud = ");
-  //        //    Serial.println(altitude);
-  //        //    Serial.print("fecha = ");
-  //        //    Serial.println(fecha_data);
-  //        //    Serial.print("ph = ");
-  //        //    Serial.println(PH);
-  //        //    Serial.print("EC = ");
-  //        //    Serial.println(EC);
-  //        //    Serial.print("RTD = ");
-  //        //    Serial.println(RTD);
-  //        //
-  //        //
-  //        String object_med = "{";
-  //        object_med.concat("\"t_SHT21\":");
-  //        object_med.concat(tempsht);
-  //        //    String object_med = "{";
-  //        //    object_med.concat("\"tambiente\":");
-  //        //    object_med.concat(temperature);
-  //        //    object_med.concat(",\"humedad\":");
-  //        //    object_med.concat(humidity);
-  //        //    object_med.concat(",\"presion\":");
-  //        //    object_med.concat(pressure);
-  //        //    object_med.concat(",\"altitud\":");
-  //        //    object_med.concat(altitude);
-  //        //    object_med.concat(",\"ph\":");
-  //        //    object_med.concat(PH);
-  //        //    object_med.concat(",\"conductividad\":");
-  //        //    object_med.concat(EC);
-  //        //    object_med.concat(",\"tagua\":");
-  //        //    object_med.concat(RTD);
-  //        //
-  //        //    object_med.concat(",\"fecha\":");
-  //        //    object_med.concat(fecha_data);
-  //        object_med.concat("}");
-  //        object_med.concat(",");
-  //        //
-  //        appendFile(SD, PATH, object_med.c_str());
-  //        readFile(SD, PATH);
-  //        counter++;
-  //    }
+  bool recebido = false;
+  if (Serial1.available())
+  {
+    char cIn = Serial1.read();
+    recebido = gps.encode(cIn);
+  }
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= intervalo)
+  {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    // Fecha*latitud*longitud
+    Serial.println(GPS());
+  }
 }

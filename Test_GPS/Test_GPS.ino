@@ -15,6 +15,8 @@
 
 char fecha[20] = " ";
 float latitud = 0, longitud = 0;
+unsigned long previousMillis = 0;        // will store last time LED was updated
+const long intervalo = 5000;
 TinyGPSPlus gps;
 
 void setup() {
@@ -22,12 +24,8 @@ void setup() {
   Serial1.begin(9600, SERIAL_8N1, RXD2, TXD2); //gps baud
 }
 
-void loop() {
-  bool recebido = false;
-  while (Serial1.available()) {
-    char cIn = Serial1.read();
-    recebido = gps.encode(cIn);
-  }
+String GPS(){
+  
   if (gps.location.isUpdated() && gps.altitude.isUpdated())
   {
     Serial.print("D/M/A: ");
@@ -36,6 +34,10 @@ void loop() {
     Serial.print(gps.altitude.feet());
     Serial.print(" | satellites: ");
     Serial.println(gps.satellites.value());
+    Serial.print(" | presición: ");
+    Serial.println(gps.hdop.value());
+    Serial.print(" | Altitud: ");
+    Serial.println(gps.altitude.meters());
     Serial.print(" | Latitud: ");
     latitud = gps.location.lat();
       longitud = gps.location.lng();
@@ -46,6 +48,23 @@ void loop() {
             gps.date.day(), gps.time.hour(), gps.time.minute(), gps.time.second());
     Serial.print(" | Fecha: ");
     Serial.println(fecha);
-    delay(500);
+    return String(fecha) + "*" + String(latitud,6) + "*" + String(longitud,6);
   }
+}
+
+void loop() {
+  bool recebido = false;
+  if (Serial1.available()) {
+    char cIn = Serial1.read();
+    recebido = gps.encode(cIn);
+  }
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= intervalo) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    //Fecha*latitud*longitud
+    Serial.println(GPS());
+  }
+  
+  
 }
