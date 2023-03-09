@@ -28,8 +28,6 @@
 // Librería que permite la comunicación I2C
 #include <Wire.h>
 /* Librerías para controlar sensores*/
-// Librería para controlar el sensor SHT21
-#include "SHT21.h"
 // Librería del sensor BME280
 #include <Adafruit_BME280.h>
 // Librería para el control del otro puerto serial
@@ -67,14 +65,11 @@ boolean botonPin = false;
 String dataMessage;
 
 // Variables para almacenar datos de los sensores
-String temperaturaA, humedadA, presionA, altitud, PH, EC, RTD, tempsht, humsht, humS;
+String temperaturaA, humedadA, presionA, altitud, PH, EC, RTD, humS;
 
 // varibles pin analógico humedad del suelo
 const int portPin = 34;
 int valorAnalogico = 0;
-
-// Variable de control del Sensor de temperatura y humedad SHT21
-SHT21 SHT21;
 
 // Variables de control para el sensor de temperatura, humedad y presión BME280
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -410,31 +405,6 @@ void initAP() {
 
 /* --------------------- FUNCIONES DE SENSORES --------------------- */
 
-// Temperatura del sensor SHT21
-String readSHT21Temperatura() {
-  float temp = SHT21.getTemperature();
-  if (isnan(temp)) {
-    Serial.println("Error al leer la temperatura del SHT21");
-    return "--";
-  } else {
-    Serial.println("Leí la temperatura y fue: ");
-    Serial.println(temp);
-    return String(temp);
-  }
-}
-
-// Humedad del sensor SHT21
-String readSHT21Humedad() {
-  float hum = SHT21.getHumidity();
-  if (isnan(hum)) {
-    Serial.println("Error al leer la humedad del SHT21");
-    return "--";
-  } else {
-    Serial.println(hum);
-    return String(hum);
-  }
-}
-
 // Temperatura del sensor BME280
 String readBME280Temperature() {
   // Lee la temperatura por defecto en Celsius
@@ -630,8 +600,6 @@ float lat2 = 0;
 // Función global para obtener diversos datos
 String getSensorsData() {
   if (botonPin) {
-    tempsht = readSHT21Temperatura();
-    humsht = readSHT21Humedad();
     temperaturaA = readBME280Temperature();
     humedadA = readBME280Humidity();
     presionA = readBME280Pressure();
@@ -642,10 +610,6 @@ String getSensorsData() {
     String object_sensors = "{";
     object_sensors.concat("\"Muestra\":");
     object_sensors.concat(muestras);
-    object_sensors.concat(",\"Temperatura SHT\":");
-    object_sensors.concat(tempsht);
-    object_sensors.concat(",\"Humedad SHT\":");
-    object_sensors.concat(humsht);
     object_sensors.concat(",\"Temperatura BME\":");
     object_sensors.concat(temperaturaA);
     object_sensors.concat(",\"Humedad BME\":");
@@ -672,7 +636,7 @@ String getSensorsData() {
 
     Serial.print(object_sensors);
 
-    dataMessage = String(muestras) + "," + String(tempsht) + "," + String(humsht) + "," + String(temperaturaA) + "," + String(humedadA) + "," + String(presionA) + "," + String(altitud) + "," + String(RTD) + "," + String(humS) + "," + String(fecha) + "," + String(latitud, 6) + "," + String(longitud, 6) + "," + String(precision) + "," + String(altitudG) + "\r\n";
+    dataMessage = String(muestras) + "," + String(temperaturaA) + "," + String(humedadA) + "," + String(presionA) + "," + String(altitud) + "," + String(RTD) + "," + String(humS) + "," + String(fecha) + "," + String(latitud, 6) + "," + String(longitud, 6) + "," + String(precision) + "," + String(altitudG) + "\r\n";
     Serial.print("Salvando la data: ");
     Serial.println(dataMessage);
 
@@ -759,35 +723,23 @@ void setup() {
 
   // Cuando ingresas a la ruta root / de la página web
   // Muestra lo que se hay en el archivo index.html
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(SPIFFS, "/index.html", "text/html");
   });
 
   // Cuando ingresas a la ruta /tiemporeal de la página web
   // Muestra lo que se hay en el archivo tiemporeal.html
-  server.on("/tiemporeal", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/tiemporeal", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(SPIFFS, "/tiempo_real.html");
   });
-  // Cuando se ingresa a tiemporeal.html se ejecuta una función en JavaScript
-  // que hace una petición a /tempsht, lo que hace que se ejecute la función readSHT21Temperatura()
-  // retornando el valor de temperatura y almacenándolo en una variable en JavaScript
-  // para luego ser graficada allá.
-  server.on("/tempsht", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", readSHT21Temperatura().c_str());
-  });
-  // Solicitud realizada desde el JavaScript para la api /humedsht y ejecuta la función readSHT21Humedad()
-  // Retornando el valor de humedad, almacenándolo en el JavaScript para luego ser graficado.
-  server.on("/humedsht", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", readSHT21Humedad().c_str());
-  });
 
-  server.on("/sensors", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/sensors", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send_P(200, "text/plain", getSensorsData().c_str());
   });
 
   // Servicio de control del sistema
   // Enciende o apaga el sistema
-  server.on("/sistema", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/sistema", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send_P(200, "text/plain", controlSistema().c_str());
   });
 
@@ -819,7 +771,7 @@ void setup() {
   if (!file) {
     Serial.println("El Archivo no existe");
     Serial.println("Creando el archivo...");
-    writeFile(SD, PATHSD, "Muestra, Temperatura sht, Humedad sht, Temperatura BME, Humedad BME, Presión BME, Altitud BME, Temperatura Suelo, Humedad Suelo,Fecha, Latitud, Longitud, Presición GPS, Altitud GPS \r\n");
+    writeFile(SD, PATHSD, "Muestra, Temperatura BME, Humedad BME, Presión BME, Altitud BME, Temperatura Suelo, Humedad Suelo,Fecha, Latitud, Longitud, Presición GPS, Altitud GPS \r\n");
   } else {
     Serial.println("El archivo existe");
     digitalWrite(ledSD, LOW);
@@ -834,14 +786,9 @@ void setup() {
   Serial.println("Inicialización SPIFFS lista.");
 
   /* SENSORES
-        SHT21: Temperatura y Humedad
         BME280: Temperatura, humedad, presión y altitud
         GPS
   */
-
-  // Inicia el sensor SHT21
-  SHT21.begin();
-  Serial.println("Inicialización SHT21 lista.");
 
   // Inicia el sensor BME
   if (!bme.begin(BME_ADDRESS)) {

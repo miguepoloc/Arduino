@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <title>Identificación Sigatoka</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+
+    <style>
+        html {
+            font-family: Helvetica;
+            display: inline-block;
+            margin: 0px auto;
+            text-align: center;
+        }
+
+        .button {
+            display: inline-block;
+            background-color: #008CBA;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            padding: 16px 40px;
+            text-decoration: none;
+            font-size: 30px;
+            margin: 2px;
+            cursor: pointer;
+        }
+
+        .button2 {
+            background-color: #f44336;
+        }
+
+        h2 {
+            font-family: Arial;
+            font-size: 2.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Identificación Sigatoka</h2>
+    <p>Estado del sistema: <strong id="estadoSys">Apagado</strong></p>
+    <button onclick="cambio(1)" id="estado1" class="button" style="background-color: #A569BD;">Estado 1</button>
+    <button onclick="cambio(2)" id="estado2" class="button" style="background-color: #3498DB;">Estado 2</button>
+    <button onclick="cambio(3)" id="estado3" class="button" style="background-color: #1ABC9C;">Estado 3</button>
+    <button onclick="cambio(4)" id="estado4" class="button" style="background-color: #F1C40F;">Estado 4</button>
+    <button onclick="cambio(5)" id="estado5" class="button" style="background-color: #0ed851;">Estado 5</button>
+    <button onclick="cambio(6)" id="estado6" class="button" style="background-color: #f44336;">Estado 6</button>
+    <div class="container">
+        <table id="latabla" class="default">
+        </table>
+    </div>
+    </div>
+
+</body>
+
+<script>
+    var estado = "Apagado";
+    var contador = 0;
+    var tipo_sigatoka = 0;
+    function cambio(tipo = 0) {
+        var xhttp1 = new XMLHttpRequest();
+        xhttp1.open("GET", "/sistema", true);
+        xhttp1.send();
+        xhttp1.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                estado = this.responseText;
+                document.getElementById("estadoSys").innerHTML = estado;
+                console.log(estado);
+            }
+        };
+        // estado = "Funcionando"
+        console.log(tipo)
+        // document.getElementById("estadoSys").innerHTML = estado;
+        // console.log(estado);
+        tipo_sigatoka = tipo;
+    }
+
+    setInterval(function () {
+        console.log(estado)
+        if (estado == "Funcionando") {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    var datax = this.responseText;
+                    console.log(datax)
+                    datax = JSON.parse(datax)
+                    console.log(datax)
+                    var claves = Object.keys(datax);
+                    console.log(claves)
+                    var valores = Object.values(datax);
+                    var html = "";
+                    for (let index = 0; index < claves.length; index++) {
+                        html += "<tr>";
+                        html += "<th scope='row'>" + claves[index] + "</th>";
+                        html += "</tr>";
+                        html += "<tr>";
+                        html += "<td>" + valores[index] + "</td>";
+                        html += "</tr>";
+                        document.getElementById("latabla").innerHTML = html;
+                    }
+                }
+            };
+            xhttp.open("GET", "/estado" + tipo_sigatoka, true);
+            xhttp.send();
+            contador = contador + 1;
+            if (contador == 5) {
+                contador = 0;
+                cambio();
+            }
+        }
+    }, 1000);
+
+</script>
+
+</html>
